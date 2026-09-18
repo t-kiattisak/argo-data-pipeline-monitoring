@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data-engineering
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-config
+  namespace: data-engineering
+data:
+  # In-cluster MinIO URL (or AWS S3 endpoint)
+  endpoint_url: "http://minio.storage.svc.cluster.local:9000"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-config
+  namespace: data-engineering
+data:
+  smtp_host: "mailhog.monitoring.svc.cluster.local"
+  smtp_port: "1025"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: data-engineering
+type: Opaque
+stringData:
+  host: "postgres-service.database.svc.cluster.local"
+  username: "postgres"
+  password: "postgrespassword"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-credentials
+  namespace: data-engineering
+type: Opaque
+stringData:
+  access_key: "minioadmin"
+  secret_key: "minioadmin"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: apigw-jwt-secrets
+  namespace: data-engineering
+type: Opaque
+stringData:
+  secret_key: "enterprise-super-secret-jwt-key"

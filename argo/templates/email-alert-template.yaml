@@ -1,0 +1,84 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ClusterWorkflowTemplate
+metadata:
+  name: email-notifier-template
+  annotations:
+    workflows.argoproj.io/description: "Reusable Cluster-wide notification template for Slack/Email alerts."
+spec:
+  templates:
+    - name: send-alert
+      inputs:
+        parameters:
+          - name: subject
+          - name: status
+          - name: duration
+          - name: workflow_name
+          - name: failure_reason
+            default: "N/A"
+          - name: kibana_url
+            default: "https://kibana.example.com/app/discover"
+      container:
+        image: python:3.12-alpine
+        command: [python, -c]
+        args:
+          - |
+            import os, smtplib
+            from email.mime.text import MIMEText
+
+            workflow = os.environ["WF_NAME"]
+            status = os.environ["WF_STATUS"]
+            duration = os.environ["WF_DURATION"]
+            failures = os.environ["WF_FAILURES"]
+            kibana = os.environ["KIBANA_URL"]
+
+            body = f"""======================================================================
+            [ARGO NOTIFICATION] PIPELINE STATUS: {status.upper()}
+            ======================================================================
+            Workflow Name : {workflow}
+            Status        : {status}
+            Duration      : {duration} seconds
+            Failed Step   : {failures}
+
+            Diagnostics & Logs:
+            - Kibana Log View  : {kibana}
+            - Argo Workflow UI : https://argo.internal.net/workflows/{workflow}
+            ======================================================================
+            Automated alert sent by Argo ClusterWorkflowTemplate."""
+
+            msg = MIMEText(body)
+            msg["Subject"] = os.environ["ALERT_SUBJECT"]
+            msg["From"] = os.environ.get("SMTP_FROM", "argo-alerts@cluster.local")
+            msg["To"] = os.environ.get("SMTP_TO", "data-engineers@example.com")
+
+            smtp_host = os.environ.get("SMTP_HOST", "mailhog.monitoring.svc.cluster.local")
+            smtp_port = int(os.environ.get("SMTP_PORT", "1025"))
+
+            print(f"Connecting to SMTP relay {smtp_host}:{smtp_port}...")
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.send_message(msg)
+            print("Alert dispatched successfully.")
+        env:
+          - name: ALERT_SUBJECT
+            value: "{{inputs.parameters.subject}}"
+          - name: WF_NAME
+            value: "{{inputs.parameters.workflow_name}}"
+          - name: WF_STATUS
+            value: "{{inputs.parameters.status}}"
+          - name: WF_DURATION
+            value: "{{inputs.parameters.duration}}"
+          - name: WF_FAILURES
+            value: "{{inputs.parameters.failure_reason}}"
+          - name: KIBANA_URL
+            value: "{{inputs.parameters.kibana_url}}"
+          - name: SMTP_HOST
+            valueFrom:
+              configMapKeyRef:
+                name: monitoring-config
+                key: smtp_host
+                optional: true
+          - name: SMTP_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: monitoring-config
+                key: smtp_port
+                optional: true

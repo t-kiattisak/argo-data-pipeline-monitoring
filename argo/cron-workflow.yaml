@@ -1,0 +1,83 @@
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: batch-data-extractor-cron
+  namespace: data-engineering
+  labels:
+    tier: pipeline
+    environment: production
+spec:
+  schedule: "0 1 * * *"  # Runs daily at 01:00 AM
+  timezone: "Asia/Bangkok"
+  concurrencyPolicy: "Forbid"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+
+  workflowSpec:
+    entrypoint: main-orchestrator
+    onExit: global-exit-handler
+    activeDeadlineSeconds: 3600  # 1 hour SLA timeout guard
+    serviceAccountName: data-pipeline-sa
+
+    templates:
+      # --- Master Orchestrator ---
+      - name: main-orchestrator
+        steps:
+          # Step 1: Delegate execution to the reusable WorkflowTemplate
+          - - name: run-batch-extractor
+              templateRef:
+                name: batch-extractor-template
+                template: execute-pipeline
+              arguments:
+                parameters:
+                  - name: export_date
+                    value: "{{workflow.creationTimestamp.Y}}-{{workflow.creationTimestamp.m}}-{{workflow.creationTimestamp.d}}"
+                  - name: retry_limit
+                    value: "2"
+
+      # --- Global onExit Handler delegating to ClusterWorkflowTemplate ---
+      - name: global-exit-handler
+        steps:
+          # Case A: Alert when Workflow Fails or Errors
+          - - name: send-failure-notification
+              templateRef:
+                clusterScope: true
+                name: email-notifier-template
+                template: send-alert
+              when: "{{workflow.status}} != Succeeded"
+              arguments:
+                parameters:
+                  - name: subject
+                    value: "[ALERT - P1] Batch Data Pipeline Failed: {{workflow.name}}"
+                  - name: status
+                    value: "{{workflow.status}}"
+                  - name: duration
+                    value: "{{workflow.duration}}"
+                  - name: workflow_name
+                    value: "{{workflow.name}}"
+                  - name: failure_reason
+                    value: "{{workflow.failures}}"
+                  - name: kibana_url
+                    value: "https://kibana.example.com/app/discover#/?_a=(query:(language:kuery,query:'service:\"batch-data-extractor\"%20AND%20level:\"ERROR\"'))"
+
+          # Case B: Send Summary on Success
+          - - name: send-success-summary
+              templateRef:
+                clusterScope: true
+                name: email-notifier-template
+                template: send-alert
+              when: "{{workflow.status}} == Succeeded"
+              arguments:
+                parameters:
+                  - name: subject
+                    value: "[INFO] Batch Data Pipeline Completed: {{workflow.name}}"
+                  - name: status
+                    value: "{{workflow.status}}"
+                  - name: duration
+                    value: "{{workflow.duration}}"
+                  - name: workflow_name
+                    value: "{{workflow.name}}"
+                  - name: failure_reason
+                    value: "None"
+                  - name: kibana_url
+                    value: "https://kibana.example.com/app/discover"
