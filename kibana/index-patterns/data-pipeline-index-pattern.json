@@ -1,0 +1,7 @@
+{
+  "attributes": {
+    "title": "pipeline-logs-*",
+    "timeFieldName": "timestamp",
+    "fields": "[{\"name\":\"timestamp\",\"type\":\"date\",\"searchable\":true,\"aggregatable\":true},{\"name\":\"service\",\"type\":\"string\",\"searchable\":true,\"aggregatable\":true},{\"name\":\"level\",\"type\":\"string\",\"searchable\":true,\"aggregatable\":true},{\"name\":\"dataset\",\"type\":\"string\",\"searchable\":true,\"aggregatable\":true},{\"name\":\"stage\",\"type\":\"string\",\"searchable\":true,\"aggregatable\":true},{\"name\":\"batch_id\",\"type\":\"string\",\"searchable\":true,\"aggregatable\":true},{\"name\":\"export_date\",\"type\":\"string\",\"searchable\":true,\"aggregatable\":true},{\"name\":\"row_count\",\"type\":\"number\",\"searchable\":true,\"aggregatable\":true},{\"name\":\"duration_ms\",\"type\":\"number\",\"searchable\":true,\"aggregatable\":true},{\"name\":\"message\",\"type\":\"string\",\"searchable\":true,\"aggregatable\":false}]"
+  }
+}
