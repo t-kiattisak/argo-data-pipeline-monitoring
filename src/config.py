@@ -9,8 +9,8 @@ class AppConfig(BaseSettings):
     SERVICE_NAME: str = "batch-data-extractor"
     EXPORT_DATE: str = ""  # e.g., 2026-09-17, defaults to yesterday if empty
 
-    # Storage Backend: 'local' หรือ 'minio' (หรือ 's3')
-    STORAGE_BACKEND: str = "local"
+    # Storage Backend: 'local' or 'minio' (or 's3')
+    STORAGE_BACKEND: str = "minio"
     LOCAL_STORAGE_DIR: str = "./data/storage"
 
     # PostgreSQL Database
@@ -20,7 +20,7 @@ class AppConfig(BaseSettings):
     DB_USER: str = "postgres"
     DB_PASSWORD: str = "postgrespassword"
 
-    # MinIO / S3 Configuration (ใช้เมื่อ STORAGE_BACKEND=minio หรือ s3)
+    # MinIO / S3 Configuration (used when STORAGE_BACKEND=minio or s3)
     AWS_REGION: str = "us-east-1"
     AWS_ENDPOINT_URL: str = "http://localhost:9000"  # MinIO endpoint
     AWS_ACCESS_KEY_ID: str = "minioadmin"
