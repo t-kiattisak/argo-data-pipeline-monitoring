@@ -26,14 +26,14 @@ flowchart TD
         end
     end
 
-    subgraph Storage["AWS Cloud Services"]
-        PG[(PostgreSQL Database<br/>JSONB event_records)]
-        S3Bucket[("AWS S3 Bucket<br/>(SSE-KMS Encrypted)")]
-        KMS["AWS KMS Key"]
+    subgraph Storage["Cloud / Local Storage"]
+        PG[("PostgreSQL Database<br/>JSONB event_records")]
+        S3Bucket[("S3 / MinIO Bucket")]
+        KMS["KMS Encryption Key"]
     end
 
     subgraph Gateway["Edge / API Gateway"]
-        APIGW["API Gateway (Kong / Envoy)<br/>(JWT Auth Verification)"]
+        APIGW["API Gateway<br/>JWT Auth Verification"]
         EventSink["Downstream Event Broker"]
     end
 
@@ -44,28 +44,27 @@ flowchart TD
     end
 
     %% Cron and Pipeline flow
-    Cron -->|Trigger Pod| ExtractorPod
+    Cron --> ExtractorPod
     Main --> DB
-    DB -->|1. Flatten JSONB Query| PG
-    PG -->|Return Rows| DB
+    DB --> PG
+    PG --> DB
     DB --> CSV
-    CSV -->|2. Buffer / Stream CSV| S3Client
-    S3Client -->|3. PutObject + KMS| S3Bucket
-    S3Bucket -.->|Encrypted with| KMS
-    S3Client -->|4. Generate 2h URL| S3Bucket
+    CSV --> S3Client
+    S3Client --> S3Bucket
+    S3Bucket -.-> KMS
     Main --> Webhook
-    Webhook -->|5. POST /events/v1/batch-completed<br/>(JWT)| APIGW
-    APIGW -->|Forward| EventSink
+    Webhook --> APIGW
+    APIGW --> EventSink
 
     %% Logging & Observability
-    ExtractorPod -.->|stdout JSON| Fluentbit
+    ExtractorPod -.-> Fluentbit
     Fluentbit --> Elasticsearch
     Elasticsearch --> Kibana
 
     %% Failure / Exit Handling
     ExtractorPod --> OnExit
-    OnExit -->|when Failed / Errored| EmailPod
-    EmailPod -->|Send Critical Alert| AlertRecipients["Data Engineering / SRE Team"]
+    OnExit --> EmailPod
+    EmailPod --> AlertRecipients["Data Engineering / SRE Team"]
 ```
 
 ---
