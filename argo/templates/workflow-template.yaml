@@ -1,0 +1,91 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: batch-extractor-template
+  namespace: data-engineering
+  annotations:
+    workflows.argoproj.io/description: "Enterprise WorkflowTemplate for extracting PostgreSQL JSONB events to S3/MinIO with full retry & telemetry."
+spec:
+  entrypoint: execute-pipeline
+  templates:
+    - name: execute-pipeline
+      inputs:
+        parameters:
+          - name: export_date
+          - name: retry_limit
+            default: "2"
+      retryStrategy:
+        limit: "{{inputs.parameters.retry_limit}}"
+        retryPolicy: "OnFailure"
+        backoff:
+          duration: "30s"
+          factor: 2
+          maxDuration: "3m"
+      metadata:
+        labels:
+          app.kubernetes.io/name: batch-data-extractor
+          app.kubernetes.io/part-of: data-pipeline
+      container:
+        image: ghcr.io/your-org/batch-data-extractor:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-m", "src.main"]
+        env:
+          - name: EXPORT_DATE
+            value: "{{inputs.parameters.export_date}}"
+          - name: DB_HOST
+            valueFrom:
+              secretKeyRef:
+                name: db-credentials
+                key: host
+          - name: DB_NAME
+            value: "appdb"
+          - name: DB_USER
+            valueFrom:
+              secretKeyRef:
+                name: db-credentials
+                key: username
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: db-credentials
+                key: password
+          # S3 / MinIO Configuration
+          - name: S3_BUCKET_NAME
+            value: "data-lake-bucket"
+          - name: AWS_ENDPOINT_URL
+            valueFrom:
+              configMapKeyRef:
+                name: storage-config
+                key: endpoint_url
+                optional: true
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: s3-credentials
+                key: access_key
+                optional: true
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: s3-credentials
+                key: secret_key
+                optional: true
+          - name: API_GATEWAY_WEBHOOK_URL
+            value: "http://apigw.ingress.svc.cluster.local/events/v1/batch-completed"
+          - name: JWT_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: apigw-jwt-secrets
+                key: secret_key
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
