@@ -1,0 +1,36 @@
+# Git & IDEs
+.git
+.gitignore
+.vscode
+.idea
+
+# Virtual environment & Dependencies
+.venv
+venv
+env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Tests & Documentation
+tests/
+docs/
+README.md
+
+# Kubernetes / Argo & Compose configs not needed in image
+argo/
+kibana/
+docker/
+docker-compose.yml
+
+# OS & Logs
+.DS_Store
+*.log
