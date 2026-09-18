@@ -1,27 +1,29 @@
 # Kibana Observability & Dashboard Assets
 
-โฟลเดอร์นี้บรรจุ Assets สำหรับ Kibana เพื่อนำเข้า (Import) และตั้งค่า Monitoring ได้ทันที
+This directory contains pre-configured assets for Elasticsearch and Kibana to facilitate immediate log visualization and monitoring.
 
 ---
 
-## สารบัญไฟล์:
+## Directory Contents:
 
 1. **`dashboards/pipeline-dashboard-export.ndjson`**:
-   - Dashboard สำเร็จรูป (Saved Objects)
-   - ประกอบด้วย:
-     - **Extracted Rows Metric**: ยอดรวมจำนวนแถวข้อมูล
-     - **Stage Duration Trend**: กราฟแสดงเวลาที่ใช้ในแต่ละขั้นตอน (DB, CSV, S3, Webhook)
-     - **Error Log Table**: ตารางค้นหา Log ที่ติด Error แบบเรียลไทม์
+   - Pre-built Saved Object dashboard ready for direct import into Kibana.
+   - Includes:
+     - **Extracted Rows Metric**: Aggregated throughput across datasets.
+     - **Stage Duration Trend**: Historical latency tracking per stage (`EXTRACT_DB`, `WRITE_CSV`, `UPLOAD_S3`, `POST_WEBHOOK`).
+     - **Error Log Table**: Real-time listing of pipeline errors and stack traces.
+
 2. **`index-patterns/data-pipeline-index-pattern.json`**:
-   - Index Pattern นิยาม Schema ฟิลด์ (`timestamp`, `row_count`, `duration_ms`, `stage`, `dataset`)
+   - Field schema definitions mapping numeric metrics (`row_count`, `duration_ms`) and categorical dimensions (`stage`, `dataset`).
+
 3. **`rules/kql-saved-queries.md`**:
-   - รวมสูตร KQL (Kibana Query Language) สำหรับค้นหาข้อผิดพลาดและตั้ง Alerts (Zero rows check, Query timeout)
+   - Standard Kibana Query Language (KQL) formulas for diagnosing failures, zero-row anomalies, and latency spikes.
 
 ---
 
-## วิธีการ Import เข้า Kibana:
-1. เปิด Kibana Web UI (`http://kibana-host:5601`)
-2. ไปที่เมนู **Stack Management** > **Saved Objects**
-3. กดปุ่ม **Import** ด้านขวาบน
-4. เลือกไฟล์ `dashboards/pipeline-dashboard-export.ndjson`
-5. เปิดหน้า Dashboard: **`[DataOps] Batch Pipeline Observability Dashboard`**
+## Import Instructions:
+1. Open the Kibana Web UI (`http://localhost:5601`).
+2. Navigate to **Stack Management** > **Saved Objects**.
+3. Click the **Import** button in the top-right corner.
+4. Select `dashboards/pipeline-dashboard-export.ndjson`.
+5. Open the newly imported dashboard: **`[DataOps] Batch Pipeline Observability Dashboard`**.

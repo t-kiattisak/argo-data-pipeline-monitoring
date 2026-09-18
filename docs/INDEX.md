@@ -4,22 +4,22 @@ Welcome to the **Argo Data Pipeline & Observability** project documentation (`ar
 
 ---
 
-## สารบัญเอกสาร (Documentation Directory)
+## Documentation Table of Contents
 
 1. [ADR-001: Batch Data Extraction & Observability Architecture](ADR-001-pipeline-observability.md)
-   - Architecture Decision Record สำหรับการออกแบบระบบ Data Extraction พร้อมระบบ Monitoring & Alerting
-   - การเปรียบเทียบข้อดี/ข้อเสียของ Argo `onExit` vs Application try/catch
+   - Architecture Decision Record for batch pipeline design with integrated monitoring and alerting.
+   - Comparative analysis: Argo `onExit` vs. Application-level try/catch.
 
 2. [ARCHITECTURE.md: System Architecture & Technical Specifications](ARCHITECTURE.md)
-   - สถาปัตยกรรมระบบโดยละเอียด (High-Level Architecture + Sequence Diagram)
-   - Generic Dataset Specifications (`DEVICE_TELEMETRY` และ `ORDER_EVENTS`)
-   - มาตรฐานความปลอดภัย (SSE-KMS, Presigned URL TTL, API Gateway JWT)
+   - Detailed system architecture (High-Level Architecture flowchart and Sequence Diagrams).
+   - Generic dataset specifications (`DEVICE_TELEMETRY` and `ORDER_EVENTS`).
+   - Security standards (SSE-KMS, Presigned URL TTL, API Gateway JWT).
 
 3. [OBSERVABILITY_GUIDE.md: Observability & Monitoring Specification](OBSERVABILITY_GUIDE.md)
-   - มาตรฐาน Structured JSON Logging สำหรับ Kibana / Elasticsearch
-   - Argo Workflow `onExit` Email Alerting Spec
-   - KQL Queries สำหรับการสร้าง Dashboard
+   - Structured JSON Logging standard for Elasticsearch / Kibana.
+   - Argo Workflow `onExit` email alerting specifications and incident runbook.
+   - Standard KQL queries for building monitoring dashboards.
 
 4. [SKILLS_AND_COMPETENCIES.md: Engineering Skills Reference](SKILLS_AND_COMPETENCIES.md)
-   - ทักษะสำคัญ: PostgreSQL JSONB Flattening, Boto3 S3/KMS, Argo Workflows, Centralized Logging
-   - Production Readiness Checklist
+   - Key technical competencies: PostgreSQL JSONB flattening, Boto3 S3/KMS, Argo Workflows, Centralized Logging.
+   - Production readiness deployment checklist.

@@ -1,6 +1,6 @@
 # System Architecture & Technical Specifications
 
-เอกสารฉบับนี้อธิบายสถาปัตยกรรมเชิงลึก (Technical Deep Dive) ของระบบ **Generic Batch Data Pipeline & Observability** สำหรับสกัดข้อมูลจาก Relational Database (PostgreSQL) ไปยัง Cloud Object Storage (AWS S3)
+This document provides a technical deep dive into the **Batch Data Pipeline & Observability** platform, designed to extract semi-structured event logs from PostgreSQL and ingest them into Cloud/Local Object Storage (S3 / MinIO).
 
 ---
 
@@ -120,9 +120,9 @@ sequenceDiagram
 
 ---
 
-## 3. Generic Dataset Specifications (Demo & Reference Domain)
+## 3. Generic Dataset Specifications
 
-เพื่อความปลอดภัยของข้อมูลองค์กร โปรเจกต์นี้ใช้โมเดลข้อมูลมาตรฐานทั่วไป (Generic E-commerce & IoT Telemetry):
+To safeguard intellectual property, this demonstration implements standardized telemetry and e-commerce models:
 
 ### Dataset 1: `DEVICE_TELEMETRY`
 - **Source:** PostgreSQL table (`iot_device_events`, JSONB column: `payload`)
@@ -165,7 +165,7 @@ sequenceDiagram
 ---
 
 ## 4. Security & Compliance
-1. **At-Rest Encryption:** ทุกไฟล์ที่บันทึกลง S3 ต้องระบุ Header `x-amz-server-side-encryption: aws:kms`
-2. **In-Transit Encryption:** เชื่อมต่อผ่าน TLS 1.3
-3. **Restricted Time-to-Live (TTL):** Presigned S3 URLs มีอายุจำกัด 2 ชั่วโมง (`ExpiresIn=7200`)
-4. **Zero Proprietary Information:** ไม่มีชื่อระบบภายใน, Database names, หรือ Business logic เฉพาะขององค์กรปรากฏในโปรเจกต์
+1. **At-Rest Encryption:** Files stored in S3 enforce server-side encryption via `aws:kms`.
+2. **In-Transit Encryption:** All transport layers enforce TLS 1.3.
+3. **Restricted Time-to-Live (TTL):** Presigned S3 URLs expire after 2 hours (`ExpiresIn=7200`).
+4. **Data Sanitization:** Strict avoidance of proprietary corporate identifiers and business rules.
