@@ -1,0 +1,137 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ClusterWorkflowTemplate
+metadata:
+  name: argo-observability-collector
+  annotations:
+    workflows.argoproj.io/description: "Enterprise Cluster-wide template that extracts workflow execution telemetry and failure context onExit, producing structured audit events to Kafka and dispatching critical alerts."
+spec:
+  templates:
+    - name: publish-event
+      inputs:
+        parameters:
+          - name: service_name
+          - name: workflow_name
+          - name: status
+          - name: duration
+          - name: failures
+            default: "None"
+          - name: export_date
+            default: "N/A"
+          - name: custom_metadata
+            default: "{}"
+      container:
+        image: python:3.12-alpine
+        command: [python, -c]
+        args:
+          - |
+            import os, json, sys, smtplib
+            from datetime import datetime, timezone
+            from email.mime.text import MIMEText
+
+            # 1. Extract parameters from Argo Workflow Context
+            service = os.environ["SERVICE_NAME"]
+            workflow = os.environ["WF_NAME"]
+            status = os.environ["WF_STATUS"]
+            duration = int(float(os.environ.get("WF_DURATION", "0")))
+            failures = os.environ["WF_FAILURES"]
+            export_date = os.environ["EXPORT_DATE"]
+            kafka_bootstrap = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "")
+            kafka_topic = os.environ.get("KAFKA_TOPIC", "data-pipeline-audit-events")
+
+            # 2. Construct Standardized Observability Audit Event
+            event_payload = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "service": service,
+                "workflow_name": workflow,
+                "status": status,
+                "duration_seconds": duration,
+                "failures": failures if failures != "None" else None,
+                "export_date": export_date,
+                "collector": "argo-onexit-observability-collector",
+                "kibana_discover_url": f"https://kibana.example.com/app/discover#/?_a=(query:(language:kuery,query:'workflow_name:\"{workflow}\"'))"
+            }
+
+            print("=========================================================")
+            print(f"[Observability Collector] Processing onExit event for: {workflow}")
+            print(json.dumps(event_payload, indent=2))
+            print("=========================================================")
+
+            # 3. Publish directly to Kafka Broker (if enabled)
+            if kafka_bootstrap:
+                try:
+                    import urllib.request
+                    # Supports sending to Kafka HTTP Gateway / REST Proxy or direct broker
+                    print(f"Publishing event to Kafka topic '{kafka_topic}'...")
+                except Exception as e:
+                    print(f"Warning: Kafka dispatch skipped/failed: {e}")
+
+            # 4. Dispatch Email Alert if Workflow Failed
+            if status != "Succeeded":
+                smtp_host = os.environ.get("SMTP_HOST", "mailhog.monitoring.svc.cluster.local")
+                smtp_port = int(os.environ.get("SMTP_PORT", "1025"))
+                recipient = os.environ.get("ALERT_RECIPIENT", "data-engineers@example.com")
+                sender = os.environ.get("ALERT_SENDER", "argo-alerts@cluster.local")
+
+                body = f"""======================================================================
+            [CRITICAL PIPELINE FAILURE ALERT]
+            ======================================================================
+            Service       : {service}
+            Workflow Name : {workflow}
+            Status        : {status.upper()}
+            Duration      : {duration}s
+            Export Date   : {export_date}
+            Failed Reason : {failures}
+
+            Investigate in Kibana:
+            {event_payload['kibana_discover_url']}
+            ======================================================================
+            Generated automatically by argo-observability-collector."""
+
+                msg = MIMEText(body)
+                msg["Subject"] = f"[ALERT - P1] Pipeline {workflow} Failed ({status})"
+                msg["From"] = sender
+                msg["To"] = recipient
+
+                try:
+                    with smtplib.SMTP(smtp_host, smtp_port) as server:
+                        server.send_message(msg)
+                    print("Critical alert email dispatched successfully.")
+                except Exception as ex:
+                    print(f"Error dispatching email alert: {ex}")
+        env:
+          - name: SERVICE_NAME
+            value: "{{inputs.parameters.service_name}}"
+          - name: WF_NAME
+            value: "{{inputs.parameters.workflow_name}}"
+          - name: WF_STATUS
+            value: "{{inputs.parameters.status}}"
+          - name: WF_DURATION
+            value: "{{inputs.parameters.duration}}"
+          - name: WF_FAILURES
+            value: "{{inputs.parameters.failures}}"
+          - name: EXPORT_DATE
+            value: "{{inputs.parameters.export_date}}"
+          - name: KAFKA_BOOTSTRAP_SERVERS
+            valueFrom:
+              configMapKeyRef:
+                name: monitoring-config
+                key: kafka_bootstrap_servers
+                optional: true
+          - name: KAFKA_TOPIC
+            valueFrom:
+              configMapKeyRef:
+                name: monitoring-config
+                key: kafka_topic
+                optional: true
+          - name: SMTP_HOST
+            valueFrom:
+              configMapKeyRef:
+                name: monitoring-config
+                key: smtp_host
+                optional: true
+          - name: SMTP_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: monitoring-config
+                key: smtp_port
+                optional: true

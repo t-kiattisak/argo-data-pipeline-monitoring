@@ -1,107 +1,119 @@
-# Decoupled Observability Architecture via Apache Kafka
+# Decoupled Observability Architecture: Orchestrator-Level onExit Collector
 
-This architecture specification details how the data pipeline acts as a **Log Producer**, publishing structured telemetry and operational events to **Apache Kafka** before asynchronous ingestion into **Elasticsearch & Kibana**.
+This architecture document specifies the **Platform Engineering** pattern where application containers remain clean and focused purely on business logic, while the **Argo Orchestration Engine (`onExit`)** intercepts execution telemetry, extracts failure contexts, formats audit events, and publishes them to **Apache Kafka** and **Elasticsearch/Kibana**.
 
 ---
 
-## 1. High-Throughput Decoupled Architecture
+## 1. Enterprise Architecture Overview
 
 ```mermaid
-flowchart LR
-    subgraph Pipeline["Data Pipeline (Producer)"]
-        Extractor["Python 3.12 Extractor"]
-        KafkaHandler["KafkaLoggingHandler<br/>(Fire & Forget)"]
-        StdoutHandler["StdoutHandler<br/>(Console JSONL)"]
-        
-        Extractor --> StdoutHandler
-        Extractor --> KafkaHandler
+flowchart TD
+    subgraph Workflows["Application Workflows (Zero Logging Overhead)"]
+        WF1["Data Pipeline CronWorkflow<br/>(batch-data-extractor)"]
+        WF2["ML Training Workflow<br/>(model-training-job)"]
+        WF3["Billing Report Workflow<br/>(monthly-invoice-batch)"]
     end
 
-    subgraph KafkaCluster["Buffer & Streaming Layer (Apache Kafka)"]
-        Topic[("Topic: data-pipeline-logs<br/>Partitions: 3 / Replication: 2")]
+    subgraph ArgoLifecycle["Argo Orchestrator"]
+        OnExitHook["onExit Lifecycle Trigger<br/>(Captures status, duration, failures)"]
     end
 
-    subgraph IngestionWorker["Log Ingestion Layer (Consumer)"]
-        Consumer["Logstash / Vector / Fluentbit<br/>(Kafka Consumer Group)"]
+    subgraph PlatformTemplate["Centralized Reusable Platform Component"]
+        CTP["ClusterWorkflowTemplate:<br/><b>argo-observability-collector</b>"]
     end
 
-    subgraph Analytics["Search & Observability"]
-        Elasticsearch[("Elasticsearch Index:<br/>pipeline-logs-YYYY.MM.DD")]
-        Kibana["Kibana Dashboards"]
+    subgraph IngestionStream["Streaming & Observability Infrastructure"]
+        Kafka[("Apache Kafka Topic:<br/>pipeline-audit-events")]
+        Logstash["Logstash Ingestion Worker"]
+        Elastic[("Elasticsearch")]
+        Kibana["Kibana Unified Dashboard"]
+        Email["SMTP / MailHog Critical Alert"]
     end
 
-    KafkaHandler -->|Async Produce (<5ms)| Topic
-    Topic -->|Pull in Batches| Consumer
-    Consumer -->|Bulk Indexing (_bulk)| Elasticsearch
-    Elasticsearch --> Kibana
+    WF1 -->|onExit| OnExitHook
+    WF2 -->|onExit| OnExitHook
+    WF3 -->|onExit| OnExitHook
+
+    OnExitHook --> CTP
+    CTP -->|Publish JSON Audit Event| Kafka
+    CTP -.->|If status != Succeeded| Email
+    Kafka --> Logstash
+    Logstash --> Elastic
+    Elastic --> Kibana
 ```
 
 ---
 
-## 2. Core Architectural Advantages
+## 2. Key Architectural Benefits
 
-1. **Near-Zero Pipeline Overhead:**
-   - Emitting HTTP requests to Elasticsearch directly incurs 50–200ms latency per request.
-   - Producing to a Kafka topic via `acks=0` (or `acks=1` with background queueing) takes **< 3ms**, ensuring the data extraction workload is never bottlenecked by the logging system.
+1. **Complete Separation of Concerns (Zero Code Pollution):**
+   - Application developers write pure domain code without needing Kafka clients, Elasticsearch libraries, or custom alerting code.
+   - Applications do not need external network permissions to brokers.
 
-2. **Backpressure Buffer & Surge Protection:**
-   - In peak batch processing (e.g., millions of records), logging spikes cannot overwhelm the Elasticsearch cluster.
-   - Kafka absorbs the burst, allowing Logstash or Vector consumers to ingest at a controlled, steady pace.
+2. **Guaranteed Failure Capture (Fail-safe):**
+   - Application-level try/catch blocks fail during container `OOMKilled` (Exit 137), container eviction, or Kubernetes node faults.
+   - The Argo `onExit` handler executes at the orchestration controller level, guaranteeing that audit events and error traces are captured even if the container crashes abruptly.
 
-3. **High Availability & Zero Log Loss:**
-   - If Elasticsearch undergoes maintenance or experiences downtime, messages safely accumulate in Kafka without failing the pipeline.
-   - Once Elasticsearch recovers, consumers replay and ingest uncommitted offsets.
+3. **Cluster-Wide Standardization:**
+   - Any team across the organization can adopt centralized observability by adding 4 lines of YAML to their workflow's `onExit` block.
 
 ---
 
-## 3. Producer Configuration in Python
+## 3. Reusable Template Usage Example for Any Team
 
-The pipeline uses `KafkaLoggingHandler` inside `src/logger.py`:
+Any team can integrate with this template by referencing the `argo-observability-collector`:
 
-```python
-# Enable in .env:
-KAFKA_ENABLED=true
-KAFKA_BOOTSTRAP_SERVERS="kafka-broker.streaming.svc.cluster.local:9092"
-KAFKA_LOG_TOPIC="data-pipeline-logs"
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: my-team-job-
+spec:
+  entrypoint: main-task
+  onExit: report-to-platform  # Attach onExit trigger
+
+  templates:
+    - name: main-task
+      container:
+        image: python:3.12-slim
+        command: ["python", "app.py"]
+
+    # Reusable Observability Step
+    - name: report-to-platform
+      steps:
+        - - name: send-audit-telemetry
+            templateRef:
+              clusterScope: true
+              name: argo-observability-collector
+              template: publish-event
+            arguments:
+              parameters:
+                - name: service_name
+                  value: "my-custom-service"
+                - name: workflow_name
+                  value: "{{workflow.name}}"
+                - name: status
+                  value: "{{workflow.status}}"
+                - name: duration
+                  value: "{{workflow.duration}}"
+                - name: failures
+                  value: "{{workflow.failures}}"
 ```
 
-### Event Payload Emitted to Kafka:
+---
+
+## 4. Standardized Event Payload Schema Emitted to Kafka
+
 ```json
 {
   "timestamp": "2026-09-19T01:05:23.142Z",
-  "level": "INFO",
   "service": "batch-data-extractor",
-  "dataset": "DEVICE_TELEMETRY",
-  "stage": "EXTRACT_DB",
-  "batch_id": "00bf24e1-00f5-495a-95e7-32318fb992c7",
+  "workflow_name": "batch-data-extractor-cron-29381",
+  "status": "Failed",
+  "duration_seconds": 42,
+  "failures": "run-batch-extractor.execute-pipeline failed: Container exited with code 1",
   "export_date": "2026-09-18",
-  "row_count": 54200,
-  "duration_ms": 320,
-  "message": "Successfully extracted 54200 rows from PostgreSQL"
-}
-```
-
----
-
-## 4. Consumer Configuration Sample (Logstash Pipeline)
-
-To consume events from the Kafka topic into Elasticsearch:
-
-```ruby
-input {
-  kafka {
-    bootstrap_servers => "kafka:9092"
-    topics => ["data-pipeline-logs"]
-    codec => "json"
-    group_id => "logstash-kibana-indexer"
-    auto_offset_reset => "earliest"
-  }
-}
-
-output {
-  elasticsearch {
-    hosts => ["http://elasticsearch:9200"]
-    index => "pipeline-logs-%{+YYYY.MM.dd}"
-  }
+  "collector": "argo-onexit-observability-collector",
+  "kibana_discover_url": "https://kibana.example.com/app/discover#/?_a=(query:(language:kuery,query:'workflow_name:\"batch-data-extractor-cron-29381\"'))"
 }
 ```

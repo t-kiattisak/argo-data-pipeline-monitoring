@@ -34,10 +34,5 @@ class AppConfig(BaseSettings):
     JWT_SECRET_KEY: str = "demo-secret-key"
     JWT_ALGORITHM: str = "HS256"
 
-    # Kafka Log Producer Configuration
-    KAFKA_ENABLED: bool = False
-    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
-    KAFKA_LOG_TOPIC: str = "data-pipeline-logs"
-
 
 config = AppConfig()
