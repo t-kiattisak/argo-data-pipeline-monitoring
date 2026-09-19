@@ -23,3 +23,7 @@ Welcome to the **Argo Data Pipeline & Observability** project documentation (`ar
 4. [SKILLS_AND_COMPETENCIES.md: Engineering Skills Reference](SKILLS_AND_COMPETENCIES.md)
    - Key technical competencies: PostgreSQL JSONB flattening, Boto3 S3/KMS, Argo Workflows, Centralized Logging.
    - Production readiness deployment checklist.
+
+5. [KAFKA_OBSERVABILITY_ARCHITECTURE.md: Decoupled Observability via Apache Kafka](KAFKA_OBSERVABILITY_ARCHITECTURE.md)
+   - High-throughput decoupled logging architecture using Apache Kafka as a message broker buffer.
+   - Producer implementation details, backpressure handling, and Logstash consumer pipelines.
